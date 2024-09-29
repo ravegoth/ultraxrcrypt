@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ultraxrcrypt</title>
+    <script src="./algorithm/ultraxrcrypt.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .textbox {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #2e2e2e;
+            border: none;
+            border-radius: 5px;
+            color: #ffffff;
+            font-size: 16px;
+            resize: none;
+        }
+        .columns {
+            display: flex;
+            justify-content: center;
+        }
+        .column {
+            flex: 1;
+            max-width: 45%;
+        }
+        .column textarea {
+            height: 200px;
+        }
+        .buttons {
+            margin-bottom: 20px;
+        }
+        .buttons input[type="button"] {
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #007acc;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .buttons input[type="button"]:hover {
+            background-color: #005f99;
+        }
+        #key {
+            max-width: 600px;
+        }
+        #chars {
+            height: 120px;
+        }
+        @media (max-width: 768px) {
+            .columns {
+                flex-direction: column;
+            }
+            .column {
+                max-width: 100%;
+                margin: 0 0 20px 0;
+            }
+            .buttons input[type="button"] {
+                width: 45%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ultraxrcrypt playground</h1>
+
+        <textarea class="textbox" id="key" placeholder="Enter key here"></textarea>
+
+        <div class="columns">
+            <div class="column">
+                <textarea class="textbox" id="input" placeholder="Input text to encrypt"></textarea>
+            </div>
+            <div class="column">
+                <textarea class="textbox" id="output" placeholder="Encrypted text"></textarea>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <input type="button" value="Encrypt" id="button_encrypt"/>
+            <input type="button" value="Decrypt" id="button_decrypt"/>
+            <input type="button" value="Reencrypt" id="button_reencrypt"/>
+            <input type="button" value="Redecrypt" id="button_redecrypt"/>
+
+            <input type="button" value="Share" id="share"/>
+        </div>
+
+        <textarea class="textbox" id="verifier" placeholder="Verification"></textarea>
+        <textarea class="textbox" id="chars" placeholder="Details"></textarea>
+
+        <h3>Hash:</h3>
+
+        <textarea class="textbox" id="hashInput" placeholder="Enter input here"></textarea>
+        <textarea class="textbox" id="hashOutput" placeholder="Hashed"></textarea>
+
+        <h3>Base64:</h3>
+
+        <textarea class="textbox" id="b64Input" placeholder="Enter input here"></textarea>
+        <textarea class="textbox" id="b64Output" placeholder="Base64"></textarea>
+    </div>
+
+    <script>
+        // Functions to convert to/from binary for URL sharing
+        function toBinary(string) {
+            const codeUnits = new Uint16Array(string.length);
+            for (let i = 0; i < codeUnits.length; i++) {
+                codeUnits[i] = string.charCodeAt(i);
+            }
+            return btoa(String.fromCharCode(...new Uint8Array(codeUnits.buffer)));
+        }
+
+        function fromBinary(encoded) {
+            const binary = atob(encoded);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < bytes.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return String.fromCharCode(...new Uint16Array(bytes.buffer));
+        }
+
+        // Textareas
+        const key = document.getElementById("key");
+        const input = document.getElementById("input");
+        const output = document.getElementById("output");
+        const verifier = document.getElementById("verifier");
+        const chars = document.getElementById("chars");
+        // b64
+        const b64Input = document.getElementById("b64Input");
+        const b64Output = document.getElementById("b64Output");
+
+        // Buttons
+        const button_encrypt = document.getElementById("button_encrypt");
+        const button_decrypt = document.getElementById("button_decrypt");
+        const button_reencrypt = document.getElementById("button_reencrypt");
+        const button_redecrypt = document.getElementById("button_redecrypt");
+        const share = document.getElementById("share");
+
+        // Encryption function
+        function encryptText() {
+            output.value = uxrcrypt(input.value, key.value);
+            b64Input.value = toBinary(input.value);
+            b64Output.value = toBinary(output.value);
+            window.location.hash = toBinary(output.value);
+            verify();
+            countChars();
+        }
+
+        // Decryption function
+        function decryptText() {
+            input.value = deuxrcrypt(output.value, key.value);
+            b64Input.value = toBinary(input.value);
+            b64Output.value = toBinary(output.value);
+            verify();
+            countChars();
+        }
+
+        // Verify function
+        function verify() {
+            verifier.value = deuxrcrypt(output.value, key.value);
+            if (verifier.value !== input.value) {
+                key.style.color = "#ff4d4d";  // Red color if verification fails
+            } else {
+                key.style.color = "#4dff4d";  // Green color if verification succeeds
+            }
+        }
+
+        // Character count function
+        function byteCount(s) {
+            return encodeURI(s).split(/%..|./).length - 1;
+        }
+
+        // Unique chars count function
+        function uniqueChars(s) {
+            return new Set(s).size;
+        }
+
+        function countChars() {
+            chars.value = "Input bytes: " + byteCount(input.value) + "\n";
+            chars.value += "Output bytes: " + byteCount(output.value) + "\n";
+            chars.value += "Input chars: " + input.value.length + "\n";
+            chars.value += "Output chars: " + output.value.length + "\n";
+            chars.value += "Key length: " + key.value.length + "\n";
+            chars.value += "Unique input chars: " + uniqueChars(input.value) + "\n";
+            chars.value += "Unique output chars: " + uniqueChars(output.value) + "\n";
+        }
+
+        // Event listeners
+        button_encrypt.onclick = function() {
+            encryptText();
+        };
+
+        button_decrypt.onclick = function() {
+            decryptText();
+        };
+
+        key.onkeyup = function() {
+            verify();
+        };
+
+        input.onkeyup = function() {
+            verify();
+            countChars();
+        };
+
+        output.onkeyup = function() {
+            verify();
+            countChars();
+        };
+
+        share.onclick = function() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Link copied to clipboard!");
+        };
+
+        button_reencrypt.onclick = function() {
+            // encrypted text goes to input
+            input.value = output.value;
+            encryptText();
+        };
+
+        button_redecrypt.onclick = function() {
+            // decrypted text goes to output
+            output.value = input.value;
+            decryptText();
+        };
+
+        hashInput.onkeyup = function() {
+            if (hashInput.value.length === 0) {
+                hashOutput.value = "";
+                return;
+            }
+            hashOutput.value = hash(hashInput.value);
+        };
+
+        // Handle URL hash for sharing encrypted text
+        if (window.location.hash) {
+            key.value = prompt("Please enter the key to decrypt the message:");
+            output.value = fromBinary(window.location.hash.substring(1));
+            decryptText();
+        }
+    </script>
+</body>
+</html>
